@@ -2,16 +2,55 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
+import sys
 from typing import Sequence
 
 import pyautogui
-BASE_DIR = Path(__file__).resolve().parent.parent
+
+def _runtime_base_dir() -> Path:
+    """Return the application base directory at runtime.
+
+    - Frozen (PyInstaller): dist/<Name>/ (parent of .app on macOS)
+    - Dev: repository's crm/ directory
+    """
+    try:
+        if getattr(sys, "frozen", False):
+            exe_dir = Path(sys.executable).resolve().parent
+            exe_dir_str = str(exe_dir).replace("\\", "/")
+            if sys.platform == "darwin" and "/Contents/MacOS" in exe_dir_str:
+                return (exe_dir / ".." / ".." / "..").resolve()
+            return exe_dir
+    except Exception:
+        pass
+    return Path(__file__).resolve().parent.parent
+
+BASE_DIR = _runtime_base_dir()
 
 pyautogui.FAILSAFE = True
 pyautogui.PAUSE = 0.15
 
 INPUT_FILE = "kompass_data_*.xlsx"
-OUTPUT_FILE = "crm_results.xlsx"
+
+def _get_output_dir() -> str:
+    """Return a directory next to the executable/app when frozen.
+
+    - macOS (.app): dist/<Name>/ (parent of the .app bundle)
+    - Windows: dist/<Name>/ (folder of the .exe)
+    - Dev: project root (crm/)
+    """
+    try:
+        if getattr(sys, "frozen", False):
+            exe_dir = Path(sys.executable).resolve().parent
+            # macOS .app: .../YourApp.app/Contents/MacOS
+            exe_dir_str = str(exe_dir).replace("\\", "/")
+            if sys.platform == "darwin" and "/Contents/MacOS" in exe_dir_str:
+                return str((exe_dir / ".." / ".." / "..").resolve())
+            return str(exe_dir)
+    except Exception:
+        pass
+    return str(BASE_DIR)
+
+OUTPUT_FILE = str(Path(_get_output_dir()) / "crm_results.xlsx")
 
 ASSETS_DIR = (BASE_DIR / "assets").resolve()
 

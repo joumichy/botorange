@@ -1,26 +1,27 @@
 #!/usr/bin/env python3
 """
-Script de lancement pour la recherche CRM
-"""
-import subprocess
-import sys
+Lanceur principal (exécutable) pour la recherche CRM.
 
-def main():
-    """Lancer le script de recherche CRM"""
+Appelle directement crm_search.main() pour compatibilité PyInstaller.
+"""
+from __future__ import annotations
+
+
+def main() -> None:
+    from crm_search import main as app_main
+
     print("=== Recherche CRM Orange ===")
-    print("Ce script va utiliser les numéros du fichier Excel Kompass")
-    print("et les rechercher dans le CRM Orange")
+    print("Ce lanceur va démarrer la recherche dans le CRM à partir d'un Excel Kompass.")
     print()
-    
+
     try:
-        # Lancer le script principal
-        subprocess.run([sys.executable, "crm_search.py"], check=True)
-    except subprocess.CalledProcessError as e:
-        print(f"Erreur lors de l'exécution: {e}")
+        app_main()
     except KeyboardInterrupt:
         print("\nScript interrompu par l'utilisateur")
     except Exception as e:
         print(f"Erreur inattendue: {e}")
 
+
 if __name__ == "__main__":
     main()
+
