@@ -16,6 +16,26 @@ from config import SCRAPING_CONFIG, SELECTORS, OUTPUT_CONFIG
 # Variable globale pour stocker les résultats partiels
 _partial_results = []
 
+
+def _get_output_dir():
+    """Return a directory next to the executable/app when frozen.
+
+    - macOS (.app): dist/<Name>/ (parent of the .app bundle)
+    - Windows: dist/<Name>/ (folder of the .exe)
+    - Dev: folder of this source file
+    """
+    try:
+        if getattr(sys, "frozen", False):
+            exe_dir = os.path.dirname(sys.executable)
+            # Detect macOS .app bundle and go three levels up to the dist folder
+            if sys.platform == "darwin" and "/Contents/MacOS" in exe_dir.replace("\\", "/"):
+                return os.path.abspath(os.path.join(exe_dir, "..", "..", ".."))
+            return exe_dir
+    except Exception:
+        pass
+    # Not frozen: write next to source
+    return os.path.dirname(os.path.abspath(__file__))
+
 def _save_partial_results():
     """Sauvegarde les résultats partiels en cas d'interruption"""
     global _partial_results
@@ -23,7 +43,8 @@ def _save_partial_results():
         try:
             df = pd.DataFrame(_partial_results)
             date_str = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-            partial_file = f"kompass_data_partial_{date_str}.xlsx"
+            out_dir = _get_output_dir()
+            partial_file = os.path.join(out_dir, f"kompass_data_partial_{date_str}.xlsx")
             
             # Sauvegarder avec la même structure que le fichier final
             with pd.ExcelWriter(partial_file, engine='openpyxl') as writer:
@@ -300,7 +321,14 @@ async def main():
             _save_partial_results()
         
         finally:
-            await browser.close()
+            try:
+                await context.close()
+            except Exception:
+                pass
+            try:
+                await browser.close()
+            except Exception:
+                pass
     
     # Afficher les résultats
     print(f"\n=== Résultats ===")
@@ -314,7 +342,11 @@ async def main():
         df_companies = pd.DataFrame(all_companies)
         
         # Sauvegarder en Excel (seulement les entreprises)
-        filename = f"{OUTPUT_CONFIG['filename_prefix']}_{datetime.now().strftime(OUTPUT_CONFIG['date_format'])}.xlsx"
+        out_dir = _get_output_dir()
+        filename = os.path.join(
+            out_dir,
+            f"{OUTPUT_CONFIG['filename_prefix']}_{datetime.now().strftime(OUTPUT_CONFIG['date_format'])}.xlsx",
+        )
         
         with pd.ExcelWriter(filename, engine='openpyxl') as writer:
             if not df_companies.empty:

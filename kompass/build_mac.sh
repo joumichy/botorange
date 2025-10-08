@@ -43,6 +43,24 @@ echo "[*] Copying Playwright browsers next to the app..."
 mkdir -p "dist/$NAME"
 cp -R "${PLAYWRIGHT_BROWSERS_PATH}" "dist/$NAME/playwright-browsers"
 
+# 7) Create a user-friendly .command launcher that keeps Terminal open
+LAUNCHER="dist/$NAME/Run_Kompass.command"
+cat > "$LAUNCHER" <<'EOF'
+#!/bin/bash
+cd "$(cd "$(dirname "$0")" && pwd)"
+echo "=== KompassScraper ==="
+echo
+export SHELL=/bin/bash
+/bin/bash -lc "./KompassScraper.app/Contents/MacOS/KompassScraper"
+status=$?
+echo
+echo "Process exited with status: $status"
+echo "Press Enter to close this window..."
+read -r _
+exit $status
+EOF
+chmod +x "$LAUNCHER"
+
 echo
 echo "[OK] Build completed: dist/$NAME/"
 echo "To distribute, zip the dist/$NAME folder or create a DMG."
