@@ -1,0 +1,33 @@
+# Environments
+venv/
+.venv/
+env/
+.env
+.env.*
+.python-version
+
+# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Build/Packaging
+build/
+dist/
+*.spec
+*.egg-info/
+
+# Playwright browsers (embedded for distribution but not in repo)
+kompass/playwright-browsers/
+
+# Logs / temp
+*.log
+.pytest_cache/
+
+# IDE / OS
+.vscode/
+.idea/
+*.iml
+.DS_Store
+Thumbs.db
+

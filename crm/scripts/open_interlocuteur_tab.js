@@ -1,0 +1,1 @@
+﻿(()=>{const e=document.getElementById('interlocuteur')?.src,t=e&&window.open(e,'_blank');if(!t)return console.warn('[snippet] fail'),null;t.onload=()=>window.close();setTimeout(()=>window.close(),2000);console.info('[snippet] ok');return t})();
