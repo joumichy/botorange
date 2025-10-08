@@ -36,8 +36,12 @@ ICON_ARG=""
 echo "[*] Running PyInstaller..."
 pyinstaller run_scrapper.py --name "$NAME" --onedir --noconfirm \
   --collect-all playwright \
-  --add-data "playwright-browsers:playwright-browsers" \
   --runtime-hook pyi_runtime_hook_playwright.py $ICON_ARG
+
+# 6) Copy Playwright browsers next to the .app to avoid PyInstaller signing issues
+echo "[*] Copying Playwright browsers next to the app..."
+mkdir -p "dist/$NAME"
+cp -R "${PLAYWRIGHT_BROWSERS_PATH}" "dist/$NAME/playwright-browsers"
 
 echo
 echo "[OK] Build completed: dist/$NAME/"
