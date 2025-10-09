@@ -43,11 +43,11 @@ def paste_snipet(snippet: str,
     time.sleep(0.8)
 
     # 1) ouvrir la console (Ctrl+Shift+K)
-      hotkeys.open_chrome_console()
+    hotkeys.open_chrome_console()
     time.sleep(0.8)
 
     # 2) sélectionner tout et vider (Ctrl+A puis Backspace)
-      hotkeys.select_all()
+    hotkeys.select_all()
     pyautogui.press("backspace")
     time.sleep(0.1)
 
@@ -179,9 +179,9 @@ def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) ->
             else:
                 print("[INFO] ✅ Resultat de recherche detecte, copie et execution du snippet...")
                 time.sleep(0.3)
-                  hotkeys.select_all()
+                hotkeys.select_all()
                 time.sleep(0.3)
-                  hotkeys.copy()
+                hotkeys.copy()
                 time.sleep(0.5)
                 pyautogui.press("enter")
                 print(f"[INFO] ✅  Resultat de recherche copie: {pyperclip.paste()}")
