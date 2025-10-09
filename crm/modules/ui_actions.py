@@ -9,6 +9,7 @@ import pyperclip
 
 from . import config
 from . import vision
+from . import hotkeys
 
 
 def _click_first_match(
@@ -91,10 +92,10 @@ def calibrate_search_region() -> None:
 
 
 def clear_search_field() -> None:
-    pyautogui.hotkey('ctrl', 'a')
+    hotkeys.select_all()
     time.sleep(0.1)
     try:
-        pyautogui.hotkey('ctrl', 'c')
+        hotkeys.copy()
         time.sleep(0.05)
         clipboard_content = pyperclip.paste()
     except Exception as exc:
@@ -147,8 +148,8 @@ def open_console_and_close_window() -> None:
     """
     try:
         print("Ouverture de la console du navigateur...")
-        # Ouvrir la console du navigateur avec Ctrl+Shift+K
-        pyautogui.hotkey('ctrl', 'shift', 'k')
+        # Ouvrir la console du navigateur (Chrome) avec un raccourci compatible OS
+        hotkeys.open_chrome_console()
         time.sleep(0.5)
         
         print("Exécution de window.close()...")
