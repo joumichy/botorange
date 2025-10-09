@@ -110,7 +110,7 @@ def main() -> None:
     print()
 
     _load_config()
-    set_keyboard_english()
+    #set_keyboard_english()
 
     # Enregistrer le callback de nettoyage (clavier français)
     set_cleanup_callback(set_keyboard_french)

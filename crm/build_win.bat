@@ -28,7 +28,9 @@ set ICON=
 echo [*] Running PyInstaller...
 pyinstaller run_crm.py --name %NAME% --onedir --noconfirm ^
   --add-data "assets;assets" ^
-  --add-data "scripts;scripts" %ICON% || goto :error
+  --add-data "scripts;scripts" ^
+  --hidden-import pyscreeze ^
+  --hidden-import PIL.ImageGrab %ICON% || goto :error
 
 echo.
 echo [OK] Build completed: dist\%NAME%\

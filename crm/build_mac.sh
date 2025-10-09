@@ -29,7 +29,9 @@ ICON_ARG=""
 echo "[*] Running PyInstaller..."
 pyinstaller run_crm.py --name "$NAME" --onedir --noconfirm \
   --add-data "assets:assets" \
-  --add-data "scripts:scripts" $ICON_ARG
+  --add-data "scripts:scripts" \
+  --hidden-import pyscreeze \
+  --hidden-import PIL.ImageGrab $ICON_ARG
 
 # 5) Create a .command launcher that keeps Terminal open via bash
 LAUNCHER="dist/$NAME/Run_CRM.command"
@@ -59,3 +61,7 @@ rm -f "dist/$NAME"/.trial*.json || true
 echo
 echo "[OK] Build completed: dist/$NAME/"
 echo "To distribute, zip the dist/$NAME folder or create a DMG."
+echo
+echo "[NOTE] On first run on macOS, grant permissions:"
+echo "  - System Settings > Privacy & Security > Screen Recording: allow Terminal and the built app."
+echo "  - System Settings > Privacy & Security > Accessibility: allow Terminal and the built app."
