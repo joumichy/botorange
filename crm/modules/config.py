@@ -4,8 +4,10 @@ import os
 from pathlib import Path
 import sys
 from typing import Sequence
-
 import pyautogui
+
+# Configuration de licence
+CRM_LICENSE_HASH = "16d74232d666243e3dd9711daaef2b7538f849efaa62cf19f91a97e82c420e34"
 
 def _runtime_base_dir() -> Path:
     """Return the application base directory at runtime.
