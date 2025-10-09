@@ -18,6 +18,7 @@ import json
 import pandas as pd
 import datetime
 import os
+from crm_search import _cleanup_callback
 
 # Variable globale pour stocker les résultats au fur et à mesure
 _global_results: List[Dict] = []
@@ -47,6 +48,11 @@ def _signal_handler(signum, frame):
     """Gestionnaire de signal pour les interruptions"""
     print(f"\n[INTERRUPTION DÉTECTÉE] Signal {signum} reçu")
     _save_partial_results()
+    # Appeler le callback de nettoyage du module parent (clavier, etc.)
+    if _cleanup_callback:
+        _cleanup_callback()
+
+    
     sys.exit(0)
 
 def _clean_text(value: object) -> str:
@@ -158,8 +164,13 @@ def _run_no_result_search(stop_event: threading.Event, flag: Dict[str, bool]) ->
         print(f"   Erreur recherche message '0 resultat': {exc}")
 
 
-def _process_single_phone(phone: str, is_last: bool) -> List[Dict]:
+def _process_single_phone(phone: str, is_last: bool, company_info_map: Dict = None) -> List[Dict]:
     results: List[Dict] = []
+    
+    # Récupérer les infos entreprise depuis le mapping (nom société + SIRET)
+    company_info = {}
+    if company_info_map and phone in company_info_map:
+        company_info = company_info_map[phone]
 
     try:
         try:
@@ -234,7 +245,7 @@ def _process_single_phone(phone: str, is_last: bool) -> List[Dict]:
             # Si on n'a pas cliqué le bouton, le pré-fetch a déjà chargé la fiche.
             # On ouvre directement l'onglet Interlocuteur via snippet JS (sans dépendre d'images).
             snippets.open_interlocuteur_tab()
-            time.sleep(1)
+            time.sleep(2)
             snippets.run_dom_interlocuteurs_snippet()
            
             # Récupérer le contenu du presse-papiers (clipboard)
@@ -250,11 +261,13 @@ def _process_single_phone(phone: str, is_last: bool) -> List[Dict]:
             infos = []
 
         if not infos:
-            status = "NOT_FOUND" if not has_result else "Direction/Dir. Generale introuvable"
+            status = "NOT_FOUND" if not has_result else "NO_CONTACT_FOUND"
             print(f"   Aucun contact pertinent pour {phone}")
             # On fixe explicitement toutes les colonnes attendues, même si vides
             results.append({
                 "phone_searched": phone,
+                "company": company_info.get('company', ''),
+                "siret": company_info.get('siret', ''),
                 "name": "",
                 "mobile": "",
                 "fix": "",
@@ -263,7 +276,8 @@ def _process_single_phone(phone: str, is_last: bool) -> List[Dict]:
                 "status": status,
             })
             time.sleep(0.5)
-            ui_actions.open_console_and_close_window()
+            if not has_result :
+                ui_actions.open_console_and_close_window()
         else:
             print(f"   {len(infos)} contact(s) Direction/Dir. Generale pour {phone}")
             print(f"   Infos detaillees: {infos}")
@@ -271,6 +285,8 @@ def _process_single_phone(phone: str, is_last: bool) -> List[Dict]:
                 normalized = _normalize_contact(info if isinstance(info, dict) else {})
                 results.append({
                     "phone_searched": phone,
+                    "company": company_info.get('company', ''),
+                    "siret": company_info.get('siret', ''),
                     "name": normalized.get("name", ""),
                     "mobile": normalized.get("mobile", ""),
                     "fix": normalized.get("fix", ""),
@@ -287,8 +303,13 @@ def _process_single_phone(phone: str, is_last: bool) -> List[Dict]:
         print(f"   Erreur pour {phone}: {exc}")
         results.append({
             "phone_searched": phone,
+            "company": company_info.get('company', ''),
+            "siret": company_info.get('siret', ''),
             "name": "",
-            "phone_found": "",
+            "mobile": "",
+            "fix": "",
+            "email": "",
+            "fonction": "",
             "status": f"Erreur: {exc}",
         })
 
@@ -299,7 +320,7 @@ def _process_single_phone(phone: str, is_last: bool) -> List[Dict]:
     return results
 
 
-def process_phone_numbers(phone_numbers: Sequence[str]) -> List[Dict]:
+def process_phone_numbers(phone_numbers: Sequence[str], company_info_map: Dict = None) -> List[Dict]:
     # Configurer le gestionnaire de signal pour les interruptions
     signal.signal(signal.SIGINT, _signal_handler)
     signal.signal(signal.SIGTERM, _signal_handler)
@@ -311,7 +332,7 @@ def process_phone_numbers(phone_numbers: Sequence[str]) -> List[Dict]:
     aggregated: List[Dict] = []
     for index, phone in enumerate(phone_numbers):
         print(f"\nRecherche {index + 1}/{len(phone_numbers)}: {phone}")
-        aggregated.extend(_process_single_phone(phone, is_last=index == len(phone_numbers) - 1))
+        aggregated.extend(_process_single_phone(phone, is_last=index == len(phone_numbers) - 1, company_info_map=company_info_map))
     return aggregated
 
 

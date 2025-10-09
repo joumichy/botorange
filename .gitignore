@@ -24,6 +24,12 @@ kompass/playwright-browsers/
 *.log
 .pytest_cache/
 
+# Data files (Excel outputs)
+*.xlsx
+*.xls
+*.xlsm
+*.xlsb
+
 # IDE / OS
 .vscode/
 .idea/

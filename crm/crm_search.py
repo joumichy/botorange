@@ -29,6 +29,15 @@ from modules import config, filesystem, snippets, ui_actions, workflow
 # Variable pour stocker les résultats partiels
 _partial_results: list[dict] = []
 
+# Callback de nettoyage (sera défini par run_crm.py si disponible)
+_cleanup_callback = None
+
+
+def set_cleanup_callback(callback):
+    """Définit une fonction de nettoyage à appeler lors des sorties"""
+    global _cleanup_callback
+    _cleanup_callback = callback
+
 
 def _save_partial_results():
     """Sauvegarde les résultats partiels en cas d'interruption"""
@@ -45,10 +54,20 @@ def _save_partial_results():
             print(f"[ERREUR SAUVEGARDE PARTIELLE] {e}")
 
 
+def _cleanup():
+    """Effectue le nettoyage avant sortie"""
+    _save_partial_results()
+    if _cleanup_callback:
+        try:
+            _cleanup_callback()
+        except Exception as e:
+            print(f"[WARN] Erreur lors du nettoyage: {e}")
+
+
 def _signal_handler(signum, frame):
     """Gestionnaire de signal pour les interruptions dans crm_search.py"""
     print(f"\n[INTERRUPTION DÉTECTÉE] Signal {signum} reçu dans crm_search.py")
-    _save_partial_results()
+    _cleanup()
     sys.exit(0)
 
 
@@ -168,11 +187,24 @@ def main() -> None:
         return
 
     phone_numbers = _clean_phone_numbers(df['phone'].dropna().tolist())
+    
+    # Créer un mapping téléphone → infos entreprise (company, siret)
+    phone_to_company_info = {}
+    for _, row in df.iterrows():
+        cleaned_phones = _clean_phone_numbers([row.get('phone', '')])
+        if cleaned_phones:
+            phone_key = cleaned_phones[0]
+            phone_to_company_info[phone_key] = {
+                'company': str(row.get('company', '')).strip(),
+                'siret': str(row.get('siret', '')).strip() if pd.notna(row.get('siret')) else ''
+            }
+    
     if not phone_numbers:
         print("Aucun numero de telephone trouve")
         return
 
     print(f"{len(phone_numbers)} numeros de telephone a rechercher")
+    print(f"✅ Mapping créé pour {len(phone_to_company_info)} numéros avec infos entreprise (nom + SIRET)")
 
     print("\n=== INSTRUCTIONS ===")
     print("1. Ouvrez votre VM dans le navigateur")
@@ -191,7 +223,8 @@ def main() -> None:
     ui_actions.calibrate_search_region()
 
     try:
-        results = workflow.process_phone_numbers(phone_numbers)
+        # Passer le mapping des infos entreprise au workflow
+        results = workflow.process_phone_numbers(phone_numbers, phone_to_company_info)
 
         # Stocker les résultats partiels pour sauvegarde d'urgence
         _partial_results.extend(results)
@@ -208,11 +241,11 @@ def main() -> None:
 
     except KeyboardInterrupt:
         print("\n[INTERRUPTION] Sauvegarde des résultats partiels...")
-        _save_partial_results()
+        _cleanup()
         return
     except Exception as exc:
         print(f"\n[ERREUR] {exc}")
-        _save_partial_results()
+        _cleanup()
         return
 
 

@@ -61,6 +61,48 @@ def _signal_handler(signum, frame):
     _save_partial_results()
     sys.exit(0)
 
+async def fetch_siret_for_company(context, company_info, index, total):
+    """Récupère le SIRET d'une entreprise dans un nouvel onglet"""
+    if not company_info.get('detailUrl'):
+        return company_info, ""
+    
+    page = None
+    try:
+        # Créer un nouvel onglet dans le même contexte de navigateur
+        page = await context.new_page()
+        
+        # Aller sur la page principale puis naviguer vers le détail
+        full_url = f"https://fr.kompass.com/easybusiness{company_info['detailUrl']}"
+        await page.goto(full_url, timeout=15000)
+        
+        # Attendre que le SIRET soit visible
+        await page.wait_for_selector('#detail-registration-numbers', timeout=10000)
+        
+        # Extraire le SIRET
+        siret = await page.evaluate("""
+        () => {
+            const siretElement = document.querySelector('#detail-registration-numbers');
+            if (siretElement) {
+                return siretElement.textContent.trim().replace(/\\s+/g, '');
+            }
+            return '';
+        }
+        """)
+        
+        print(f"  [{index+1}/{total}] ✅ {company_info['company'][:40]:<40} SIRET: {siret}")
+        return company_info, siret
+        
+    except Exception as e:
+        print(f"  [{index+1}/{total}] ❌ {company_info['company'][:40]:<40} Erreur: {str(e)[:30]}")
+        return company_info, ""
+    finally:
+        if page:
+            try:
+                await page.close()
+            except:
+                pass
+
+
 async def wait_for_next_button_enabled(page, max_wait_time=3000, poll_interval=200):
     """
     Attend que le bouton next soit activé avec polling
@@ -138,8 +180,25 @@ async def main():
     except ValueError:
         max_pages = 3
     
+    # Demander si on veut extraire les SIRET
+    extract_siret = input("\nExtraire les numéros SIRET ? (y/n, défaut: n): ").lower().strip()
+    extract_siret = extract_siret in ['y', 'yes', 'o', 'oui']
+    
+    # Si extraction SIRET activée, demander le niveau de parallélisme
+    parallel_limit = 5
+    if extract_siret:
+        try:
+            parallel_limit = int(input("Nombre de pages de détail SIRET en parallèle (défaut: 5, max: 10): ") or "5")
+            parallel_limit = min(parallel_limit, 10)  # Limiter à 10 pour ne pas surcharger
+        except ValueError:
+            parallel_limit = 5
+    
     print(f"\nConfiguration:")
-    print(f"  Pages: {max_pages}")
+    print(f"  Pages de résultats: {max_pages}")
+    if extract_siret:
+        print(f"  Extraction SIRET: OUI ({parallel_limit} pages de détail simultanées)")
+    else:
+        print(f"  Extraction SIRET: NON (scraping rapide)")
     
     # Confirmation
     confirm = input("\nVoulez-vous continuer ? (y/n): ").lower()
@@ -190,7 +249,9 @@ async def main():
                 return
             
             for page_num in range(1, max_pages + 1):
-                print(f"\nScraping de la page {page_num}...")
+                print(f"\n{'='*60}")
+                print(f"📄 Scraping de la page {page_num}/{max_pages}")
+                print(f"{'='*60}")
                 
                 # Attendre que le tableau soit chargé
                 try:
@@ -198,13 +259,12 @@ async def main():
                 except:
                     print("Tableau non trouvé, tentative de recherche alternative...")
                 
-                # Extraire les données de la page actuelle avec les sélecteurs dynamiques
-                page_data = await page.evaluate(f"""
+                # Extraire les informations de base + les liens de détail
+                company_links = await page.evaluate(f"""
                 () => {{
                     const results = [];
                     const rows = document.querySelectorAll('table tbody tr');
                     
-                    // Sélecteurs dynamiques depuis la config
                     const selectors = {{
                         company: `{SELECTORS['company_name']}`,
                         phone: `{SELECTORS['phone_number']}`,
@@ -213,60 +273,31 @@ async def main():
                     }};
                     
                     rows.forEach((row, index) => {{
+                        // Extraire les données de base
+                        const companyElement = row.querySelector(selectors.company);
+                        const phoneElement = row.querySelector(selectors.phone);
+                        const cityElement = row.querySelector(selectors.city);
+                        const addressElement = row.querySelector(selectors.address);
+                        
+                        // Trouver le lien de détail (avec l'attribut data-ng-href)
+                        const detailLink = row.querySelector('a[role="button"][data-ng-href^="#/detail/"]');
+                        
                         const rowData = {{
-                            company: '',
-                            phone: '',
-                            city: '',
-                            address: ''
+                            company: companyElement?.textContent.trim() || '',
+                            phone: phoneElement?.textContent.trim() || '',
+                            city: cityElement?.textContent.trim() || '',
+                            address: addressElement?.textContent.trim() || '',
+                            detailUrl: detailLink?.getAttribute('data-ng-href') || detailLink?.getAttribute('href') || null
                         }};
                         
-                        // Extraire le nom de l'entreprise
-                        const companyElement = row.querySelector(selectors.company);
-                        if (companyElement) {{
-                            rowData.company = companyElement.textContent.trim();
-                        }}
-                        
-                        // Extraire le numéro de téléphone
-                        const phoneElement = row.querySelector(selectors.phone);
-                        if (phoneElement) {{
-                            rowData.phone = phoneElement.textContent.trim();
-                        }}
-                        
-                        // Extraire la ville
-                        const cityElement = row.querySelector(selectors.city);
-                        if (cityElement) {{
-                            rowData.city = cityElement.textContent.trim();
-                        }}
-                        
-                        // Extraire l'adresse
-                        const addressElement = row.querySelector(selectors.address);
-                        if (addressElement) {{
-                            rowData.address = addressElement.textContent.trim();
-                        }}
-                        
-                        // Si on n'a pas trouvé de téléphone avec les sélecteurs spécifiques, essayer une approche générale
+                        // Fallback pour le téléphone
                         if (!rowData.phone) {{
                             const phoneRegex = /(\\+33\\s?[0-9\\s\\.\\-]{{8,}})|(0[1-9][0-9\\s\\.\\-]{{8,}})/;
-                            const fullText = row.textContent;
-                            const match = fullText.match(phoneRegex);
-                            if (match) {{
-                                rowData.phone = match[0].trim();
-                            }}
+                            const match = row.textContent.match(phoneRegex);
+                            if (match) rowData.phone = match[0].trim();
                         }}
                         
-                        // Si on n'a pas trouvé le nom de l'entreprise, essayer une approche générale
-                        if (!rowData.company) {{
-                            const cells = row.querySelectorAll('td');
-                            cells.forEach(cell => {{
-                                const text = cell.textContent.trim();
-                                if (text && text.length > 3 && !text.includes('+') && 
-                                    !text.match(/^[0-9\\s\\.\\-]+$/) && !rowData.company) {{
-                                    rowData.company = text;
-                                }}
-                            }});
-                        }}
-                        
-                        if (rowData.phone || rowData.company) {{
+                        if (rowData.company || rowData.phone) {{
                             results.push(rowData);
                         }}
                     }});
@@ -275,27 +306,55 @@ async def main():
                 }}
                 """)
                 
-                print(f"Trouvé {len(page_data)} entrées sur la page {page_num}")
+                print(f"✅ Trouvé {len(company_links)} entreprises sur cette page")
                 
-                # Ajouter les données à nos listes
-                for data in page_data:
-                    if data['company']:
+                # Si extraction SIRET activée
+                if extract_siret:
+                    print(f"⏳ Récupération des SIRET en parallèle ({parallel_limit} simultanées)...\n")
+                    
+                    # Récupérer les SIRET en parallèle avec limite de concurrence
+                    semaphore = asyncio.Semaphore(parallel_limit)
+                    
+                    async def fetch_with_semaphore(company_info, idx):
+                        async with semaphore:
+                            return await fetch_siret_for_company(context, company_info, idx, len(company_links))
+                    
+                    tasks = [fetch_with_semaphore(info, idx) 
+                            for idx, info in enumerate(company_links)]
+                    results_with_siret = await asyncio.gather(*tasks)
+                    
+                    # Ajouter les données complètes avec SIRET
+                    for company_info, siret in results_with_siret:
                         company_data = {
-                            'company': data['company'],
-                            'phone': data['phone'],
-                            'city': data['city'],
-                            'address': data['address']
+                            'company': company_info['company'],
+                            'phone': company_info['phone'],
+                            'city': company_info['city'],
+                            'address': company_info['address'],
+                            'siret': siret
                         }
                         all_companies.append(company_data)
-                        # Ajouter aux résultats partiels pour sauvegarde d'urgence
                         _partial_results.append(company_data)
-                
-                print(f"📊 Total collecté jusqu'à présent: {len(_partial_results)} entreprises")
+                    
+                    print(f"\n📊 Total collecté jusqu'à présent: {len(_partial_results)} entreprises")
+                    print(f"   Dont {sum(1 for c in _partial_results if c.get('siret'))} avec SIRET")
+                else:
+                    # Mode rapide sans SIRET
+                    for company_info in company_links:
+                        company_data = {
+                            'company': company_info['company'],
+                            'phone': company_info['phone'],
+                            'city': company_info['city'],
+                            'address': company_info['address']
+                        }
+                        all_companies.append(company_data)
+                        _partial_results.append(company_data)
+                    
+                    print(f"📊 Total collecté jusqu'à présent: {len(_partial_results)} entreprises")
                 
                 # Aller à la page suivante si ce n'est pas la dernière page
                 if page_num < max_pages:
                     try:
-                        print(f"Navigation vers la page {page_num + 1}...")
+                        print(f"\n⏭️  Navigation vers la page {page_num + 1}...")
                         
                         # Utiliser la fonction d'attente avec polling pour le bouton next
                         next_button, is_enabled = await wait_for_next_button_enabled(page)
@@ -303,13 +362,13 @@ async def main():
                         if next_button and is_enabled:
                             await next_button.click()
                             await page.wait_for_timeout(SCRAPING_CONFIG['page_delay'])
-                            print(f"Navigation réussie vers la page {page_num + 1}")
+                            print(f"✅ Navigation réussie vers la page {page_num + 1}\n")
                         else:
-                            print("Bouton suivant non trouvé ou non activé, arrêt du scraping")
+                            print("❌ Bouton suivant non trouvé ou non activé, arrêt du scraping")
                             break
                             
                     except Exception as e:
-                        print(f"Erreur lors de la navigation vers la page suivante: {e}")
+                        print(f"❌ Erreur lors de la navigation vers la page suivante: {e}")
                         break
             
         except KeyboardInterrupt:
@@ -331,8 +390,13 @@ async def main():
                 pass
     
     # Afficher les résultats
-    print(f"\n=== Résultats ===")
+    print(f"\n{'='*60}")
+    print(f"=== Résultats Finaux ===")
+    print(f"{'='*60}")
     print(f"Entreprises trouvées: {len(all_companies)}")
+    if extract_siret:
+        print(f"Avec SIRET: {sum(1 for c in all_companies if c.get('siret'))}")
+        print(f"Sans SIRET: {sum(1 for c in all_companies if not c.get('siret'))}")
     
     # Sauvegarder les résultats finaux
     if all_companies:
