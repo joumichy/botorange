@@ -1,33 +1,54 @@
 #!/usr/bin/env python3
 """
-Lanceur principal du scraper Kompass (point d'entrée recommandé)
+Lanceur principal Kompass (point d'entrée recommandé)
 
-Exécute directement la fonction `main()` du module `main` pour être
-compatible avec un exécutable PyInstaller (frozen) et l'exécution source.
+- Charge la configuration (.env) à côté du binaire/script
+- Résout le chemin des navigateurs Playwright en mode dev/installed
+- Applique la politique d'essai/déverrouillage via security_utils
+- Appelle main.main() (async) pour démarrer l'app
 """
 from __future__ import annotations
+from config import KOMPASS_LICENSE_HASH
 
+import asyncio
 import os
 import sys
-import asyncio
+
+from security_utils import load_expected_hash, ensure_trial
+
 
 try:
-    from main import main as app_main  # assure l'inclusion de main.py lors du freeze
+    from main import main as app_main  # inclusion de main.py lors du freeze
 except Exception:
     app_main = None  # type: ignore[assignment]
 
 
-def _set_bundled_playwright_browsers() -> None:
-    """Privilégie un dossier local `playwright-browsers` si présent."""
-    candidates = []
-    base_dir = os.path.dirname(getattr(sys, "executable", "") or os.path.abspath(__file__))
-    candidates.append(os.path.join(base_dir, "playwright-browsers"))
+def _get_script_dir() -> str:
+    """Retourne le dossier du script (dev) ou de l'exécutable (installé)."""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(sys.executable)
+    return os.path.dirname(os.path.abspath(__file__))
 
+
+def _set_bundled_playwright_browsers() -> None:
+    """Résout PLAYWRIGHT_BROWSERS_PATH pour dev et .app/.exe."""
+    candidates: list[str] = []
+    script_dir = _get_script_dir()
+    candidates.append(os.path.join(script_dir, "playwright-browsers"))
+
+    # macOS .app parent traversal
+    parent = script_dir
+    for _ in range(4):
+        parent = os.path.dirname(parent)
+        if not parent:
+            break
+        candidates.append(os.path.join(parent, "playwright-browsers"))
+
+    # PyInstaller temp and CWD fallbacks
     meipass = getattr(sys, "_MEIPASS", None)
     if meipass:
         candidates.append(os.path.join(meipass, "playwright-browsers"))
         candidates.append(os.path.join(os.path.dirname(meipass), "playwright-browsers"))
-
     candidates.append(os.path.join(os.getcwd(), "playwright-browsers"))
 
     for c in candidates:
@@ -36,8 +57,22 @@ def _set_bundled_playwright_browsers() -> None:
             break
 
 
+def _load_env_file() -> None:
+    """Injecte le hash de licence depuis config.py (plus de .env utilisé)."""
+    try:
+        os.environ.setdefault("KOMPASS_LICENSE_HASH", KOMPASS_LICENSE_HASH)
+    except Exception:
+        pass
+
+
 def main() -> None:
     _set_bundled_playwright_browsers()
+    _load_env_file()
+
+    # Trial / unlock
+    expected_hash = load_expected_hash()
+    if not ensure_trial(expected_hash):
+        sys.exit(2)
 
     print("=== Scraper Kompass EasyBusiness ===")
     print("Ce lanceur démarre le script principal.")

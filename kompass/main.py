@@ -339,6 +339,15 @@ async def main():
         print("\nSauvegarde des résultats finaux...")
         
         # Créer le DataFrame des entreprises
+        max_rows_env = os.getenv("KOMPASS_MAX_ROWS")
+        if max_rows_env:
+            try:
+                limit = int(max_rows_env)
+                if limit >= 0:
+                    all_companies = all_companies[:limit]
+                    print(f"Limitation active: enregistrement des {len(all_companies)} premières entrées")
+            except Exception:
+                pass
         df_companies = pd.DataFrame(all_companies)
         
         # Sauvegarder en Excel (seulement les entreprises)

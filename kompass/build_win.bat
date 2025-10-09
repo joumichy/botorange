@@ -45,6 +45,12 @@ pyinstaller run_scrapper.py --name %NAME% --onedir --noconfirm ^
 
 echo.
 echo [OK] Build completed: dist\%NAME%\
+
+REM Remove license/trial artifacts if present (should be runtime-only)
+if exist "dist\%NAME%\license.key" del /q "dist\%NAME%\license.key"
+if exist "dist\%NAME%\.trial.json" del /q "dist\%NAME%\.trial.json"
+if exist "dist\%NAME%\.trial.bak.json" del /q "dist\%NAME%\.trial.bak.json"
+for %%F in ("dist\%NAME%\\.trial*.json") do if exist "%%~fF" del /q "%%~fF"
 echo To distribute, zip the dist\%NAME% folder.
 goto :end
 

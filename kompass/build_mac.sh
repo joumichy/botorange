@@ -62,5 +62,12 @@ EOF
 chmod +x "$LAUNCHER"
 
 echo
+echo "[*] Cleaning any license/trial artifacts (should be runtime-only)..."
+rm -f "dist/$NAME/license.key" || true
+rm -f "dist/$NAME/.trial.json" || true
+rm -f "dist/$NAME/.trial.bak.json" || true
+rm -f "dist/$NAME"/.trial*.json || true
+
+echo
 echo "[OK] Build completed: dist/$NAME/"
 echo "To distribute, zip the dist/$NAME folder or create a DMG."

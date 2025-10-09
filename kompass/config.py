@@ -2,6 +2,7 @@
 """
 Configuration pour le scraper Kompass
 """
+KOMPASS_LICENSE_HASH="16d74232d666243e3dd9711daaef2b7538f849efaa62cf19f91a97e82c420e34"
 
 # Configuration du scraping
 SCRAPING_CONFIG = {
