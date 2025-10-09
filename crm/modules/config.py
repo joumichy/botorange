@@ -12,16 +12,16 @@ CRM_LICENSE_HASH = "16d74232d666243e3dd9711daaef2b7538f849efaa62cf19f91a97e82c42
 def _runtime_base_dir() -> Path:
     """Return the application base directory at runtime.
 
-    - Frozen (PyInstaller): dist/<Name>/ (parent of .app on macOS)
-    - Dev: repository's crm/ directory
+    - Frozen (PyInstaller): use ``sys._MEIPASS`` when available, otherwise the
+      directory of the executable (on macOS this is ``.../.app/Contents/MacOS``).
+    - Dev: repository's ``crm/`` directory.
     """
     try:
         if getattr(sys, "frozen", False):
-            exe_dir = Path(sys.executable).resolve().parent
-            exe_dir_str = str(exe_dir).replace("\\", "/")
-            if sys.platform == "darwin" and "/Contents/MacOS" in exe_dir_str:
-                return (exe_dir / ".." / ".." / "..").resolve()
-            return exe_dir
+            meipass = getattr(sys, "_MEIPASS", None)
+            if meipass:
+                return Path(meipass).resolve()
+            return Path(sys.executable).resolve().parent
     except Exception:
         pass
     return Path(__file__).resolve().parent.parent
@@ -65,7 +65,7 @@ INTERLOCUTOR_BUTTON_IMAGE = asset("interlocutor.png")
 INTERLOCUTOR_BUTTON_IMAGE_2 = asset("interlocutor-2.png")
 INTERLOCUTOR_BUTTON_IMAGE_3 = asset("interlocutor-3.png")
 INTERLOCUTOR_BUTTON_IMAGE_4 = asset("interlocuteur-4.png")
-INTERLOCUTOR_BUTTON_IMAGE_5 = asset("interlocuteur-5.png")
+INTERLOCUTOR_BUTTON_IMAGE_5 = asset("interlotcuteur-5.png")
 LIST_INTERLOCUTOR_IMAGE = asset("list-interlocutors.png")
 PRE_FETCH_IMAGE = asset("pre-fetch.png")
 PRE_FETCH_IMAGE_2 = asset("pre-fetch-2.png")

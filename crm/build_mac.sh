@@ -28,7 +28,8 @@ ICON_ARG=""
 
 echo "[*] Running PyInstaller..."
 pyinstaller run_crm.py --name "$NAME" --onedir --noconfirm \
-  --add-data "assets:assets" $ICON_ARG
+  --add-data "assets:assets" \
+  --add-data "scripts:scripts" $ICON_ARG
 
 # 5) Create a .command launcher that keeps Terminal open via bash
 LAUNCHER="dist/$NAME/Run_CRM.command"

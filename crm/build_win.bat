@@ -27,7 +27,8 @@ set NAME=CRMSearch
 set ICON=
 echo [*] Running PyInstaller...
 pyinstaller run_crm.py --name %NAME% --onedir --noconfirm ^
-  --add-data "assets;assets" %ICON% || goto :error
+  --add-data "assets;assets" ^
+  --add-data "scripts;scripts" %ICON% || goto :error
 
 echo.
 echo [OK] Build completed: dist\%NAME%\

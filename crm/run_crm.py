@@ -34,13 +34,12 @@ def set_keyboard_english():
 
     if system == "Windows":
          # --- Windows : exécuter la commande PowerShell ---
-            cmd = [
-                "powershell",
-                "-Command",
-                "Set-WinUserLanguageList en-US -Force"
-            ]
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("[INFO] ✅ Clavier basculé en anglais (US) via PowerShell")
+            LANG_EN = 0x0409  # English (US)
+            hwnd = ctypes.windll.user32.GetForegroundWindow()
+            # Active le layout anglais (US)
+            ctypes.windll.user32.ActivateKeyboardLayout(ctypes.c_ulong(LANG_EN), 0)
+            ctypes.windll.user32.PostMessageW(hwnd, 0x0050, LANG_EN, 0)
+            print("[INFO] ✅ Clavier basculé en anglais (US) [Windows]")
             
     elif system == "Darwin":  # macOS
         script = '''
