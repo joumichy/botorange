@@ -217,6 +217,9 @@ def main() -> None:
 
     input("Appuyez sur Entree quand vous etes pret (VM ouverte avec champ de recherche visible)...")
 
+    # Basculer vers le navigateur pour libérer le curseur sur macOS
+    ui_actions.activate_browser_window()
+
     print("Demarrage du script dans 3 secondes...")
     time.sleep(3)
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 import os
 import time
 from typing import Sequence
+import subprocess
+import platform
 
 import pyautogui
 import pyperclip
@@ -165,6 +167,43 @@ def open_console_and_close_window() -> None:
         print(f"Erreur lors de l'ouverture de la console et exécution: {exc}")
 
 
+def activate_browser_window() -> bool:
+    """
+    Met le navigateur (Chrome/Firefox) au premier plan sur macOS.
+    Cela libère le curseur et met le terminal en arrière-plan.
+    """
+    system = platform.system()
+    
+    if system == "Darwin":  # macOS
+        # Essayer d'activer Chrome en priorité, puis Firefox
+        browsers = ["Google Chrome", "Firefox", "Safari"]
+        
+        for browser in browsers:
+            try:
+                script = f'''
+                tell application "{browser}"
+                    activate
+                end tell
+                '''
+                result = subprocess.run(
+                    ["osascript", "-e", script],
+                    capture_output=True,
+                    timeout=2
+                )
+                if result.returncode == 0:
+                    print(f"[INFO] Navigateur activé: {browser}")
+                    return True
+            except Exception:
+                continue
+        
+        print("[WARN] Impossible d'activer automatiquement le navigateur")
+        return False
+    
+    else:
+        # Sur Windows, pas besoin (le problème n'existe pas)
+        return True
+
+
 __all__ = [
     
     "calibrate_search_region",
@@ -174,5 +213,6 @@ __all__ = [
     "submit_search",
     
     "open_console_and_close_window",
+    "activate_browser_window",
 ]
 
