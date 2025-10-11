@@ -292,6 +292,7 @@ def _process_single_phone(phone: str, is_last: bool, company_info_map: Dict = No
                     "fix": normalized.get("fix", ""),
                     "email": normalized.get("email", ""),
                     "fonction": normalized.get("fonction", ""),
+                    "category": info.get("category", ""),
                     "status": "FOUND",
                 })
 

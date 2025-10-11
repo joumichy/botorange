@@ -73,7 +73,7 @@ async def fetch_siret_for_company(context, company_info, index, total):
         
         # Aller sur la page principale puis naviguer vers le détail
         full_url = f"https://fr.kompass.com/easybusiness{company_info['detailUrl']}"
-        await page.goto(full_url, timeout=15000)
+        await page.goto(full_url, timeout=30000)
         
         # Attendre que le SIRET soit visible
         await page.wait_for_selector('#detail-registration-numbers', timeout=10000)

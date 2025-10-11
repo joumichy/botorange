@@ -160,8 +160,6 @@ def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) ->
             raise RuntimeError("Chargement Interlocuteur non detecte (image list-interlocutors.png introuvable).")
         
         print("[INFO] Page Interlocuteur detectee, execution du snippet...")
-        screen_w, screen_h = pyautogui.size()
-        pyautogui.click(screen_w // 2, screen_h // 2)
         time.sleep(0.3)
        
 

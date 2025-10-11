@@ -42,14 +42,14 @@ def open_chrome_console(delay: float = 0.8) -> None:
         if _is_macos():
             pyautogui.hotkey("command", "option", "j")
         else:
-            pyautogui.hotkey("ctrl", "shift", "j")
+            pyautogui.hotkey("ctrl", "shift", "k")
         time.sleep(delay)
     except Exception:
         # Fallback to opening DevTools (not directly Console)
         if _is_macos():
             pyautogui.hotkey("command", "option", "i")
         else:
-            pyautogui.hotkey("ctrl", "shift", "i")
+            pyautogui.hotkey("ctrl", "shift", "k")
         time.sleep(delay)
 
 

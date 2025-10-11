@@ -70,15 +70,12 @@ def set_keyboard_french():
     system = platform.system()
 
     if system == "Windows":
-        # --- Windows : exécuter la commande PowerShell ---
-            cmd = [
-                "powershell",
-                "-Command",
-                "Set-WinUserLanguageList fr-FR -Force"
-            ]
-            subprocess.run(cmd, check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            print("[INFO] ✅ Clavier basculé en français (FR) via PowerShell")
-           
+        # Ancienne commande pour basculer le clavier en français (FR)
+        LANG_FR = 0x040c  # French
+        hwnd = ctypes.windll.user32.GetForegroundWindow()
+        ctypes.windll.user32.ActivateKeyboardLayout(ctypes.c_ulong(LANG_FR), 0)
+        ctypes.windll.user32.PostMessageW(hwnd, 0x0050, LANG_FR, 0)
+        print("[INFO] ✅ Clavier basculé en français (FR) [Windows]")
 
     elif system == "Darwin":  # macOS
         script = '''
