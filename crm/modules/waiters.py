@@ -46,6 +46,7 @@ def wait_for_any_image_on_screen(
     scales: Sequence[float] | None = None,
     stop_event=None,
 ):
+    print(f"   Attente de l'image: {image_paths}")
     start = time.time()
     while time.time() - start < timeout:
         if stop_event is not None and stop_event.is_set():

@@ -244,10 +244,11 @@ def _process_single_phone(phone: str, is_last: bool, company_info_map: Dict = No
         if has_result:
             # Si on n'a pas cliqué le bouton, le pré-fetch a déjà chargé la fiche.
             # On ouvre directement l'onglet Interlocuteur via snippet JS (sans dépendre d'images).
+            print("   Ouverture de l'onglet Interlocuteur via snippet JS...")
             snippets.open_interlocuteur_tab()
             time.sleep(2)
+            print("   Execution du snippet DOM Interlocuteur...")
             snippets.run_dom_interlocuteurs_snippet()
-           
             # Récupérer le contenu du presse-papiers (clipboard)
             clipboard_content = pyperclip.paste()
             try:

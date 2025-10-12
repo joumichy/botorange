@@ -25,7 +25,12 @@ SELECTORS = {
         'button:has-text(">")',
         'a:has-text(">")'
     ],
-    'main_table': 'table'
+    'main_table': 'table',
+    'search_button': [
+        'button.btn.btn-ebolBlue[data-ng-click="seeResult()"]',
+        'button[data-ng-click="seeResult()"]',
+        'button:has-text("Voir résultat")'
+    ]
 }
 
 # Configuration des fichiers de sortie

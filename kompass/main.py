@@ -193,12 +193,17 @@ async def main():
         except ValueError:
             parallel_limit = 5
     
+    # Demander si on veut cliquer automatiquement sur le bouton "Voir résultat(s)"
+    auto_click_search = input("\nCliquer automatiquement sur le bouton 'Voir résultat(s)' ? (y/n, défaut: n): ").lower().strip()
+    auto_click_search = auto_click_search in ['y', 'yes', 'o', 'oui']
+    
     print(f"\nConfiguration:")
     print(f"  Pages de résultats: {max_pages}")
     if extract_siret:
         print(f"  Extraction SIRET: OUI ({parallel_limit} pages de détail simultanées)")
     else:
         print(f"  Extraction SIRET: NON (scraping rapide)")
+    print(f"  Clic auto 'Voir résultat(s)': {'OUI' if auto_click_search else 'NON'}")
     
     # Confirmation
     confirm = input("\nVoulez-vous continuer ? (y/n): ").lower()
@@ -229,13 +234,47 @@ async def main():
             
             print("\n📋 Instructions:")
             print("1. Connectez-vous à votre compte Kompass si nécessaire")
-            print("2. Effectuez votre recherche et allez sur la page avec les résultats")
-            print("3. Revenez dans ce terminal et appuyez sur Entrée")
+            if auto_click_search:
+                print("2. Configurez votre recherche (ne cliquez PAS sur 'Voir résultat(s)')")
+                print("3. Revenez dans ce terminal et appuyez sur Entrée")
+                print("   → Le script cliquera automatiquement sur 'Voir résultat(s)'")
+            else:
+                print("2. Effectuez votre recherche et allez sur la page avec les résultats")
+                print("3. Revenez dans ce terminal et appuyez sur Entrée")
             print()
             print("⏳ En attente...")
             
-            # Attendre que l'utilisateur soit prêt avec les résultats
-            input("Appuyez sur Entrée quand vous êtes sur la page avec les résultats de recherche...")
+            # Attendre que l'utilisateur soit prêt
+            if auto_click_search:
+                input("Appuyez sur Entrée quand vous avez configuré votre recherche...")
+                
+                # Chercher et cliquer sur le bouton "Voir résultat(s)" via JavaScript
+                print("\n🔍 Clic sur le bouton 'Voir résultat(s)'...")
+                try:
+                    clicked = await page.evaluate("""
+                    () => {
+                        const btn = Array.from(document.querySelectorAll('button.btn.btn-ebolBlue.ng-binding'))
+                            .find(b => b.textContent.includes('Voir résultat'));
+                        if (btn && !btn.disabled) {
+                            btn.click();
+                            return true;
+                        }
+                        return false;
+                    }
+                    """)
+                    
+                    if clicked:
+                        print("✅ Bouton cliqué avec succès")
+                        await page.wait_for_timeout(3000)
+                    else:
+                        print("⚠️ Bouton non trouvé ou désactivé")
+                        input("Appuyez sur Entrée pour continuer quand vous êtes sur la page de résultats...")
+                        
+                except Exception as e:
+                    print(f"⚠️ Erreur: {e}")
+                    input("Appuyez sur Entrée pour continuer quand vous êtes sur la page de résultats...")
+            else:
+                input("Appuyez sur Entrée quand vous êtes sur la page avec les résultats de recherche...")
             
             # Attendre un peu pour que la page se charge
             await page.wait_for_timeout(2000)

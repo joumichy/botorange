@@ -231,7 +231,7 @@ def ensure_trial(expected_hash: str | None) -> bool:
             # Premier lancement ou fichiers absents → initialiser
             print("[INFO] ⏳ Initialisation des fichiers d'essai...")
             _write_trial_pair(now, now, key, mid)
-            os.environ["KOMPASS_MAX_ROWS"] = "20"
+            os.environ["KOMPASS_MAX_ROWS"] = "300"
             return True
     except SystemExit as e:
         print(f"[ERREUR CRITIQUE] {e}")
@@ -253,7 +253,7 @@ def ensure_trial(expected_hash: str | None) -> bool:
         hours = (remaining % 86400) // 3600
         minutes = (remaining % 3600) // 60
         print(f"[Période d'essai] ⏳ Temps restant : {days}j {hours}h {minutes}min")
-        os.environ["KOMPASS_MAX_ROWS"] = "20"
+        os.environ["KOMPASS_MAX_ROWS"] = "300"
         return True
 
     print("\n[Essai expiré] Cette version est limitée.")

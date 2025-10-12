@@ -121,8 +121,6 @@ DEFAULT_SCALES: Sequence[float] = (1.0, 0.97, 1.03, 0.94, 1.06)
 SEARCH_SCAN_REGION: tuple[int, int, int, int] | None = None
 RESULT_REGION: tuple[int, int, int, int] = (500, 250, 700, 600)
 
-OCR_LANG = "fra"
-OCR_CONFIG = "--psm 6"
 
 __all__ = [
     "BASE_DIR",
