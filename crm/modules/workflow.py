@@ -143,6 +143,10 @@ def _run_pre_fetch_search(stop_event: threading.Event, flag: Dict[str, bool]) ->
                 data = []
             flag["data"] = data
             flag["found"] = True
+            # Si le pré-fetch a réellement retourné des données, on considère
+            # cela comme un état terminal et on stoppe les autres threads.
+            if data:
+                stop_event.set()
             time.sleep(0.5)
     except Exception as exc:
         print(f"   Erreur recherche 'Pre-Fetch': {exc}")
@@ -161,6 +165,7 @@ def _run_no_result_search(stop_event: threading.Event, flag: Dict[str, bool]) ->
             print("   [X] Aucun resultat trouve")
             flag["found"] = True
             stop_event.set()
+            return
     except Exception as exc:
         print(f"   Erreur recherche message '0 resultat': {exc}")
 
@@ -235,9 +240,11 @@ def _process_single_phone(phone: str, is_last: bool, company_info_map: Dict = No
             time.sleep(0.1)
 
         stop_event.set()
-        thread_interlocutor.join(timeout=1)
-        thread_no_result.join(timeout=1)
-        thread_pre_fetch.join(timeout=1)
+        # Attendre la terminaison réelle des threads afin d'éviter
+        # toute interférence avec le numéro suivant.
+        thread_interlocutor.join()
+        thread_no_result.join()
+        thread_pre_fetch.join()
 
         # Succès si bouton trouvé OU si le pré-fetch a retourné des résultats JSON
         has_result = interlocutor_found["found"] or bool(pre_fetch_found.get("data"))

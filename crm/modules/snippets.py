@@ -29,6 +29,37 @@ def _load_snippet(snippet_name: str) -> str:
         raise RuntimeError(f"Lecture snippet JS echouee: {exc} ({path})") from exc
 
 
+def open_snippet_in_notepad(snippet_name: str) -> None:
+    """
+    Ouvre le fichier du snippet dans Notepad, copie son contenu, puis
+    ferme Notepad avec les commandes demandées.
+    """
+    # Résoudre le chemin du snippet (dans scripts/ par défaut)
+    path = SNIPPET_DIR / snippet_name
+    if not path.exists():
+        raise FileNotFoundError(f"Snippet introuvable: {path}")
+
+    # Lecture/validation
+    try:
+        _ = path.read_text(encoding="utf-8")
+    except Exception as exc:
+        raise RuntimeError(f"Lecture snippet JS echouee: {exc} ({path})") from exc
+
+    # Ouvrir Notepad, copier, fermer
+    np = subprocess.Popen(["notepad.exe", str(path)])
+    time.sleep(1.0)
+    hotkeys.select_all()
+    time.sleep(0.2)
+    hotkeys.copy()
+    time.sleep(0.3)
+    # Fermer Notepad via les commandes fournies
+    try:
+        subprocess.run(["taskkill", "/F", "/IM", "notepad.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        subprocess.run(["taskkill", "/F", "/IM", "notepadapp.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    except Exception:
+        pass
+
+
 
 
 
@@ -46,57 +77,26 @@ def paste_snipet(snippet: str,
     # 0) délai avant démarrage (garde ton timing d'origine)
     time.sleep(0.8)
 
-    # Méthode demandée: ouvrir Bloc‑notes avec le contenu, copier, fermer, puis coller dans la console
+    # Méthode demandée: ouvrir directement le fichier du snippet dans Notepad,
+    # copier, fermer (via taskkill fournis), puis coller dans la console
     try:
         candidate = (snippet or "").strip()
-        js_text = candidate
-        # Si 'snippet' est un chemin absolu, ou un nom .js dans le dossier scripts
         if candidate:
-            if os.path.isabs(candidate) and os.path.isfile(candidate):
-                js_text = open(candidate, 'r', encoding='utf-8').read()
-            elif candidate.lower().endswith('.js'):
-                possible_path = SNIPPET_DIR / candidate
-                if possible_path.exists() and possible_path.is_file():
-                    js_text = possible_path.read_text(encoding='utf-8')
-
-        # Écrit le contenu dans un fichier temporaire et l’ouvre avec Bloc‑notes
-        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.js', encoding='utf-8') as tf:
-            tf.write(js_text)
-            temp_path = tf.name
-
-        np = subprocess.Popen(["notepad.exe", temp_path])
-        time.sleep(1.0)
-        # Focus Bloc‑notes: sélectionner tout et copier
-        hotkeys.select_all()
-        time.sleep(0.2)
-        hotkeys.copy()
-        time.sleep(0.3)
-        # Fermer Bloc‑notes de manière fiable (PowerShell Stop-Process sur le PID ouvert)
-        try:
-            subprocess.run(["taskkill", "/F", "/IM", "notepad.exe"], stdout=subprocess.DEVNULL)
-            subprocess.run(["taskkill", "/F", "/IM", "notepadapp.exe"], stdout=subprocess.DEVNULL)
-        except Exception:
-            print(f"[WARN] Suppression du fichier temporaire echouee: {temp_path}")
-            pass
-        time.sleep(0.4)
-        try:
-            os.unlink(temp_path)
-        except Exception:
-            pass
-
-        # Ouvrir la console, vider, coller, exécuter
-        hotkeys.open_chrome_console()
-        time.sleep(0.8)
-        hotkeys.select_all()
-        pyautogui.press("backspace")
-        time.sleep(0.1)
-        hotkeys.paste()
-        time.sleep(0.2)
-        pyautogui.press("enter")
-        time.sleep(0.1)
-        return
+            # si c'est un nom de fichier .js, on va chercher dans scripts/
+            if candidate.lower().endswith('.js'):
+                open_snippet_in_notepad(candidate)
+                hotkeys.open_chrome_console()
+                time.sleep(0.8)
+                hotkeys.select_all()
+                pyautogui.press("backspace")
+                time.sleep(0.1)
+                hotkeys.paste()
+                time.sleep(0.2)
+                pyautogui.press("enter")
+                time.sleep(0.1)
+                return
     except Exception:
-        # Si Bloc‑notes échoue, on retombera sur la logique existante ci‑dessous
+        # Si Notepad échoue, on retombera sur la logique existante ci‑dessous
         pass
 
     # 1) ouvrir la console (Ctrl+Shift+K)
@@ -237,7 +237,7 @@ def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) ->
        
 
     try:
-        paste_snipet(snippet)
+        paste_snipet(snippet_name)
         time.sleep(0.5)
         if snippet_name in ("dom_interlocuteurs_snippet.js", "dom_get_first_interlocuteurs_snippet.js"):
             detected = waiters.wait_for_any_image_on_screen(
