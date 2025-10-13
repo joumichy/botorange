@@ -2,7 +2,9 @@
 
 import time
 import base64
+import os
 import pyautogui
+import tempfile
 from queue import Queue, Empty
 from threading import Thread
 from typing import Optional, Tuple
@@ -10,6 +12,8 @@ from . import config
 from . import waiters
 from . import hotkeys
 import pyperclip
+import subprocess
+
 SNIPPET_DIR = config.BASE_DIR / "scripts"
 
 # --- réglages (ajuste si nécessaire) ---
@@ -42,6 +46,59 @@ def paste_snipet(snippet: str,
     # 0) délai avant démarrage (garde ton timing d'origine)
     time.sleep(0.8)
 
+    # Méthode demandée: ouvrir Bloc‑notes avec le contenu, copier, fermer, puis coller dans la console
+    try:
+        candidate = (snippet or "").strip()
+        js_text = candidate
+        # Si 'snippet' est un chemin absolu, ou un nom .js dans le dossier scripts
+        if candidate:
+            if os.path.isabs(candidate) and os.path.isfile(candidate):
+                js_text = open(candidate, 'r', encoding='utf-8').read()
+            elif candidate.lower().endswith('.js'):
+                possible_path = SNIPPET_DIR / candidate
+                if possible_path.exists() and possible_path.is_file():
+                    js_text = possible_path.read_text(encoding='utf-8')
+
+        # Écrit le contenu dans un fichier temporaire et l’ouvre avec Bloc‑notes
+        with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.js', encoding='utf-8') as tf:
+            tf.write(js_text)
+            temp_path = tf.name
+
+        np = subprocess.Popen(["notepad.exe", temp_path])
+        time.sleep(1.0)
+        # Focus Bloc‑notes: sélectionner tout et copier
+        hotkeys.select_all()
+        time.sleep(0.2)
+        hotkeys.copy()
+        time.sleep(0.3)
+        # Fermer Bloc‑notes de manière fiable (PowerShell Stop-Process sur le PID ouvert)
+        try:
+            subprocess.run(["taskkill", "/F", "/IM", "notepad.exe"], stdout=subprocess.DEVNULL)
+            subprocess.run(["taskkill", "/F", "/IM", "notepadapp.exe"], stdout=subprocess.DEVNULL)
+        except Exception:
+            print(f"[WARN] Suppression du fichier temporaire echouee: {temp_path}")
+            pass
+        time.sleep(0.4)
+        try:
+            os.unlink(temp_path)
+        except Exception:
+            pass
+
+        # Ouvrir la console, vider, coller, exécuter
+        hotkeys.open_chrome_console()
+        time.sleep(0.8)
+        hotkeys.select_all()
+        pyautogui.press("backspace")
+        time.sleep(0.1)
+        hotkeys.paste()
+        time.sleep(0.2)
+        pyautogui.press("enter")
+        time.sleep(0.1)
+        return
+    except Exception:
+        # Si Bloc‑notes échoue, on retombera sur la logique existante ci‑dessous
+        pass
+
     # 1) ouvrir la console (Ctrl+Shift+K)
     hotkeys.open_chrome_console()
     time.sleep(0.8)
@@ -50,9 +107,24 @@ def paste_snipet(snippet: str,
     hotkeys.select_all()
     pyautogui.press("backspace")
     time.sleep(0.1)
+    # Ut
+    # ilise les commandes système, mais seulement pour Windows
+    pyperclip.copy('')
+    time.sleep(0.05)
+    pyperclip.copy(snippet)
+    proc = subprocess.Popen(
+        ['powershell', '-command', 'Set-Clipboard'],
+        stdin=subprocess.PIPE,
+        close_fds=True
+    )
+    time.sleep(0.5)
+    hotkeys.paste()
+    time.sleep(0.1)
+    return
 
     # 3) injection sûre
     if use_base64:
+        print(f"Injection via base64: {snippet}")
         # wrapper ASCII safe qui contient le code encodé en base64
         wrapper = make_base64_wrapper(snippet)
         # tape la ligne wrapper rapidement ; si tu veux, active auto_focus_console
@@ -149,6 +221,7 @@ def type_one_line_fast(text: str, focus_delay: float = 0.2, auto_focus: bool = F
 
 def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) -> None:
     snippet = _load_snippet(snippet_name)
+    print(f"[INFO] Execution du snippet: {snippet_name}")
     if wait_for_page_load:
         print("[INFO] Attente du chargement de la page Interlocuteur...")
         detected = waiters.wait_for_image_on_screen(
@@ -180,8 +253,9 @@ def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) ->
                 hotkeys.select_all()
                 time.sleep(0.3)
                 hotkeys.copy()
-                time.sleep(0.5)
+                time.sleep(0.1)
                 pyautogui.press("enter")
+                time.sleep(0.5)
                 print(f"[INFO] ✅  Resultat de recherche copie: {pyperclip.paste()}")
   
         

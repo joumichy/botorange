@@ -143,6 +143,7 @@ def _run_pre_fetch_search(stop_event: threading.Event, flag: Dict[str, bool]) ->
                 data = []
             flag["data"] = data
             flag["found"] = True
+            time.sleep(0.5)
     except Exception as exc:
         print(f"   Erreur recherche 'Pre-Fetch': {exc}")
 

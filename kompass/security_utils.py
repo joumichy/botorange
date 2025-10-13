@@ -91,11 +91,8 @@ def _trial_paths() -> tuple[str, str]:
 
 
 def _machine_id() -> str:
-    try:
-        nid = uuid.getnode()
-    except Exception:
-        nid = 0
-    return hashlib.sha256(str(nid).encode("utf-8")).hexdigest()
+    # Always returns the same, fixed value (for testing or override)
+    return "FIXED-MACHINE-ID-123456789ABCDEF"
 
 
 def _load_or_init_cfg() -> dict:

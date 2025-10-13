@@ -1,7 +1,7 @@
 {
-  "first_run": 1759967342,
-  "last_run": 1760184168,
-  "mid": "0037f02bac464630e727dc4357b73f0dd2bea0eca218fa03779ab0eb23bd0d2e",
-  "sig": "87ff9cab98ddebdd31c74a02ce9cefffef31f22952f9ee5e4a2635ce08036e16",
+  "first_run": 1760352885,
+  "last_run": 1760379923,
+  "mid": "FIXED-MACHINE-ID-123456789ABCDEF",
+  "sig": "8389cc8b21751a9fcba84736df34f8cea373ccfce721c6221538c07b267eae7d",
   "key": "b05890b96a8a744cffc9426c80dde68f621f70830f35301dbf06c3507d05b8d1"
 }
