@@ -19,6 +19,7 @@ import pandas as pd
 import datetime
 import os
 from crm_search import _cleanup_callback
+from . import hotkeys
 
 # Variable globale pour stocker les résultats au fur et à mesure
 _global_results: List[Dict] = []
@@ -250,7 +251,8 @@ def _process_single_phone(phone: str, is_last: bool, company_info_map: Dict = No
         has_result = interlocutor_found["found"] or bool(pre_fetch_found.get("data"))
 
         if has_result:
-            # Si on n'a pas cliqué le bouton, le pré-fetch a déjà chargé la fiche.
+        
+            
             # On ouvre directement l'onglet Interlocuteur via snippet JS (sans dépendre d'images).
             print("   Ouverture de l'onglet Interlocuteur via snippet JS...")
             snippets.open_interlocuteur_tab()
@@ -330,6 +332,215 @@ def _process_single_phone(phone: str, is_last: bool, company_info_map: Dict = No
     return results
 
 
+def _process_single_phone_with_watcher(phone: str, is_last: bool, company_info_map: Dict = None) -> List[Dict]:
+    """
+    Version amelioree utilisant un watcher JS au lieu de 3 threads Python.
+    Plus rapide, plus fiable, moins de CPU.
+    """
+    global _global_results  # Declarer au debut de la fonction
+    results: List[Dict] = []
+    
+    # Recuperer les infos entreprise depuis le mapping
+    company_info = {}
+    if company_info_map and phone in company_info_map:
+        company_info = company_info_map[phone]
+    
+    try:
+        # 1. Focus et lancer la recherche
+        try:
+            ui_actions.focus_search_field()
+        except RuntimeError as exc:
+            print(f"[X] ERREUR CRITIQUE: {exc}")
+            print("[X] Le script s'arrete car le champ de recherche est introuvable")
+            return []
+        
+        pyautogui.typewrite(str(phone), interval=0.05)
+        time.sleep(0.5)
+        ui_actions.submit_search()
+        
+        # 2. Ouvrir la console et injecter le watcher JS
+        print("   📡 Ouverture console et injection watcher JS...")
+        hotkeys.open_chrome_console()
+        time.sleep(0.8)
+        
+        # 3. Executer le watcher qui surveille les 3 conditions en parallele
+        result = snippets.execute_watcher_snippet(
+            'parallel_search_watcher.js',
+            timeout=60.0
+        )
+        
+        status = result.get('status')
+        has_result = result.get('hasResult', False)
+        elapsed_ms = result.get('elapsed', 0)
+        
+        print(f"   ⏱️  Detection en {elapsed_ms}ms: {status}")
+        
+        # 4. Traiter selon le statut detecte
+        if status == 'NO_RESULT':
+            print("   ❌ Aucun resultat trouve")
+            results.append({
+                "phone_searched": phone,
+                "company": company_info.get('company', ''),
+                "siret": company_info.get('siret', ''),
+                "name": "",
+                "mobile": "",
+                "fix": "",
+                "email": "",
+                "fonction": "",
+                "status": "NOT_FOUND",
+            })
+            time.sleep(0.5)
+            if not is_last:
+                ui_actions.open_console_and_close_window()
+        
+        elif status in ('INTERLOCUTEUR_FOUND', 'PREFETCH_READY'):
+            print("   ✅ Resultat detecte, extraction des interlocuteurs...")
+            
+            # Si PREFETCH, c'est juste une etape de configuration pour preparer la page
+            if status == 'PREFETCH_READY':
+                print("   📊 Prefetch detecte - Configuration de la page...")
+                snippets.run_dom_get_first_interlocuteurs_snippet()
+                
+                # Attendre le prompt avec les donnees
+                time.sleep(1.5)            
+                
+                prefetch_data = pyperclip.paste().strip()
+                
+                # Fermer le prompt
+                pyautogui.press('escape')
+                time.sleep(0.3)
+                
+                # Verifier qu'il y a bien des donnees (JSON avec interlocuteurs)
+                if not prefetch_data or prefetch_data == []:
+                    print("   ⚠️  Prefetch vide - Aucun interlocuteur trouve")
+                    results.append({
+                        "phone_searched": phone,
+                        "company": company_info.get('company', ''),
+                        "siret": company_info.get('siret', ''),
+                        "name": "",
+                        "mobile": "",
+                        "fix": "",
+                        "email": "",
+                        "fonction": "",
+                        "status": "NO_CONTACT_FOUND",
+                    })
+                    if not is_last:
+                        ui_actions.open_console_and_close_window()
+                    _global_results.extend(results)
+                    return results
+                
+                # Verifier que c'est du JSON valide
+                try:
+                    prefetch_json = json.loads(prefetch_data)
+                    count = len(prefetch_json) if isinstance(prefetch_json, list) else 1
+                    print(f"   ✅ Prefetch: {count} entreprise(s) trouvee(s), configuration OK")
+                except json.JSONDecodeError:
+                    print("   ⚠️  Prefetch: donnees invalides, on arrete")
+                    results.append({
+                        "phone_searched": phone,
+                        "company": company_info.get('company', ''),
+                        "siret": company_info.get('siret', ''),
+                        "name": "",
+                        "mobile": "",
+                        "fix": "",
+                        "email": "",
+                        "fonction": "",
+                        "status": "ERROR",
+                    })
+                    if not is_last:
+                        ui_actions.open_console_and_close_window()
+                    _global_results.extend(results)
+                    return results
+                
+                time.sleep(2)  # Attendre que la page soit prete apres le clic
+            
+            # Ouvrir l'onglet Interlocuteur via snippet JS
+            print("   Ouverture de l'onglet Interlocuteur via snippet JS...")
+            snippets.open_interlocuteur_tab()
+            time.sleep(2)
+            
+            print("   Execution du snippet DOM Interlocuteur...")
+            snippets.run_dom_interlocuteurs_snippet()
+            
+            # Recuperer le contenu du presse-papiers
+            clipboard_content = pyperclip.paste()
+            try:
+                infos = json.loads(clipboard_content)
+            except Exception as e:
+                print(f"   Erreur lors de la lecture du presse-papiers: {e}")
+                infos = []
+            
+            time.sleep(1)
+            
+            if infos:
+                print(f"   📊 {len(infos)} contact(s) trouves")
+                for info in infos:
+                    normalized = _normalize_contact(info if isinstance(info, dict) else {})
+                    results.append({
+                        "phone_searched": phone,
+                        "company": company_info.get('company', ''),
+                        "siret": company_info.get('siret', ''),
+                        "name": normalized.get("name", ""),
+                        "mobile": normalized.get("mobile", ""),
+                        "fix": normalized.get("fix", ""),
+                        "email": normalized.get("email", ""),
+                        "fonction": normalized.get("fonction", ""),
+                        "status": "FOUND",
+                    })
+            else:
+                print("   ⚠️  Resultat trouve mais aucun contact extrait")
+                results.append({
+                    "phone_searched": phone,
+                    "company": company_info.get('company', ''),
+                    "siret": company_info.get('siret', ''),
+                    "name": "",
+                    "mobile": "",
+                    "fix": "",
+                    "email": "",
+                    "fonction": "",
+                    "status": "NO_CONTACT_FOUND",
+                })
+            
+            if not is_last:
+                print("Pause de 2 secondes...")
+                time.sleep(2)
+        
+        else:  # TIMEOUT
+            print("   ⏱️  Timeout - Aucune detection")
+            results.append({
+                "phone_searched": phone,
+                "company": company_info.get('company', ''),
+                "siret": company_info.get('siret', ''),
+                "name": "",
+                "mobile": "",
+                "fix": "",
+                "email": "",
+                "fonction": "",
+                "status": "TIMEOUT",
+            })
+            if not is_last:
+                ui_actions.open_console_and_close_window()
+    
+    except Exception as exc:
+        print(f"   Erreur pour {phone}: {exc}")
+        results.append({
+            "phone_searched": phone,
+            "company": company_info.get('company', ''),
+            "siret": company_info.get('siret', ''),
+            "name": "",
+            "mobile": "",
+            "fix": "",
+            "email": "",
+            "fonction": "",
+            "status": f"Erreur: {exc}",
+        })
+    
+    # Ajouter les resultats a la liste globale pour sauvegarde d'urgence
+    _global_results.extend(results)
+    
+    return results
+
+
 def process_phone_numbers(phone_numbers: Sequence[str], company_info_map: Dict = None) -> List[Dict]:
     # Configurer le gestionnaire de signal pour les interruptions
     signal.signal(signal.SIGINT, _signal_handler)
@@ -342,7 +553,7 @@ def process_phone_numbers(phone_numbers: Sequence[str], company_info_map: Dict =
     aggregated: List[Dict] = []
     for index, phone in enumerate(phone_numbers):
         print(f"\nRecherche {index + 1}/{len(phone_numbers)}: {phone}")
-        aggregated.extend(_process_single_phone(phone, is_last=index == len(phone_numbers) - 1, company_info_map=company_info_map))
+        aggregated.extend(_process_single_phone_with_watcher(phone, is_last=index == len(phone_numbers) - 1, company_info_map=company_info_map))
     return aggregated
 
 

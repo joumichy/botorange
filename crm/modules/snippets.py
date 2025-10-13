@@ -5,9 +5,10 @@ import base64
 import os
 import pyautogui
 import tempfile
+import json
 from queue import Queue, Empty
 from threading import Thread
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Dict
 from . import config
 from . import waiters
 from . import hotkeys
@@ -216,7 +217,71 @@ def type_one_line_fast(text: str, focus_delay: float = 0.2, auto_focus: bool = F
     _producer_chunks(text, q)
     consumer.join()
 
- 
+def execute_watcher_snippet(snippet_name: str, timeout: float = 60.0) -> Dict:
+    """
+    Execute un watcher JS qui surveille le DOM et affiche un prompt() avec le resultat.
+    Recupere le resultat via Ctrl+A, Ctrl+C du prompt (pas de navigator.clipboard).
+    
+    Le JS affiche prompt() seulement quand il a un resultat affirme.
+    Python attend le prompt, copie une seule fois, puis ferme le prompt.
+    
+    Returns:
+        Dict avec keys: status ('INTERLOCUTEUR_FOUND'|'PREFETCH_READY'|'NO_RESULT'|'TIMEOUT'), 
+                       hasResult (bool), elapsed (ms)
+    """
+    snippet = _load_snippet(snippet_name)
+    
+    # 1. Injecter le watcher
+    print(f"   📡 Injection watcher: {snippet_name}")
+    paste_snipet(snippet_name)
+    time.sleep(1.0)  # Laisser le script demarrer
+    
+    # 2. Attendre que le watcher affiche un prompt() avec le resultat
+    # Le prompt bloque, donc on attend qu'il apparaisse
+    start = time.time()
+    check_count = 0
+    
+    while time.time() - start < timeout:
+        time.sleep(2.0)  # Check moins frequent (toutes les 2s)
+        check_count += 1
+        
+        # 3. Essayer de copier le contenu du champ prompt
+        # Si un prompt est ouvert, Ctrl+A va selectionner son contenu
+        hotkeys.select_all()
+        time.sleep(0.15)
+        hotkeys.copy()
+        time.sleep(0.15)
+        
+        copied = pyperclip.paste().strip()
+        
+        # 4. Verifier si c'est du JSON valide avec nos keys
+        if copied.startswith('{') and copied.endswith('}'):
+            try:
+                result = json.loads(copied)
+                status = result.get('status')
+                
+                if status in ('INTERLOCUTEUR_FOUND', 'PREFETCH_READY', 'NO_RESULT', 'TIMEOUT'):
+                    elapsed_ms = result.get('elapsed', 0)
+                    print(f"   ✅ Watcher termine: {status} ({elapsed_ms}ms)")
+                    
+                    # 5. Fermer le prompt avec Escape
+                    time.sleep(0.2)
+                    pyautogui.press('escape')
+                    time.sleep(0.2)
+                    
+                    return result
+                    
+            except json.JSONDecodeError:
+                pass
+        
+        # Afficher progression toutes les 10s
+        if check_count % 5 == 0:
+            elapsed = time.time() - start
+            print(f"   ⏳ Attente du prompt watcher... ({elapsed:.1f}s)")
+    
+    # Timeout Python
+    print(f"   ⏱️  Timeout Python ({timeout}s) - Le prompt n'est pas apparu")
+    return {'status': 'TIMEOUT', 'elapsed': int(timeout * 1000), 'hasResult': False}
 
 
 def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) -> None:
@@ -282,6 +347,7 @@ __all__ = [
     "open_interlocuteur_tab",
     "run_dom_interlocuteurs_snippet",
     "run_dom_get_first_interlocuteurs_snippet",
+    "execute_watcher_snippet",
 ]
 
 
