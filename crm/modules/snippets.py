@@ -285,13 +285,12 @@ def execute_watcher_snippet(snippet_name: str, timeout: float = 60.0) -> Dict:
 
 
 def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) -> None:
-    snippet = _load_snippet(snippet_name)
     print(f"[INFO] Execution du snippet: {snippet_name}")
     if wait_for_page_load:
         print("[INFO] Attente du chargement de la page Interlocuteur...")
         detected = waiters.wait_for_image_on_screen(
             config.LIST_INTERLOCUTOR_IMAGE,
-            timeout=20.0,
+            timeout=60.0,
             interval=0.5,
         )
         if not detected:
@@ -307,7 +306,7 @@ def  _execute_snippet(snippet_name: str, *, wait_for_page_load: bool = False) ->
         if snippet_name in ("dom_interlocuteurs_snippet.js", "dom_get_first_interlocuteurs_snippet.js"):
             detected = waiters.wait_for_any_image_on_screen(
                 config.SEARCH_RESULT_TEMPLATES,
-                timeout=60.0,
+                timeout=120.0,
                 interval=0.5,
             )
             if not detected:
